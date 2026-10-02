@@ -1,0 +1,55 @@
+# Dependencies & Agent files
+.antigravity/
+node_modules/
+.pnp
+.pnp.js
+
+# Build outputs
+dist/
+build/
+*.tsbuildinfo
+
+# Environment variables (strict: never commit secrets, only .env.example)
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+!**/.env.example
+
+# SQLite Database & Prisma files
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+backend/prisma/*.db
+backend/prisma/*.db-journal
+
+# Uploads (keep directory structure with .gitkeep)
+backend/uploads/items/*
+!backend/uploads/items/.gitkeep
+backend/uploads/avatars/*
+!backend/uploads/avatars/.gitkeep
+uploads/items/*
+!uploads/items/.gitkeep
+uploads/avatars/*
+!uploads/avatars/.gitkeep
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Editor & OS files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?

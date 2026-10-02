@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <defs>
+    <linearGradient id="bgDarkGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#121217" />
+      <stop offset="100%" stop-color="#09090b" />
+    </linearGradient>
+    <linearGradient id="cyanGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38bdf8" />
+      <stop offset="50%" stop-color="#0ea5e9" />
+      <stop offset="100%" stop-color="#0284c7" />
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="10" stdDeviation="14" flood-opacity="0.5" />
+    </filter>
+  </defs>
+
+  <!-- Dark Gaming Surface Background -->
+  <rect width="512" height="512" rx="112" fill="url(#bgDarkGrad)" stroke="#27272a" stroke-width="8" />
+
+  <!-- Gift Box Group with Drop Shadow -->
+  <g filter="url(#shadow)">
+    <!-- Box Body -->
+    <rect x="116" y="240" width="280" height="180" rx="14" fill="#18181b" stroke="#3f3f46" stroke-width="4" />
+
+    <!-- Box Lid -->
+    <rect x="96" y="180" width="320" height="60" rx="12" fill="#27272a" stroke="#52525b" stroke-width="4" />
+
+    <!-- Vertical Neon Cyan Ribbon -->
+    <rect x="232" y="180" width="48" height="240" fill="url(#cyanGrad)" rx="4" />
+
+    <!-- Ribbon Bow Left -->
+    <path d="M 236 180 C 180 180 148 100 200 90 C 244 80 252 160 256 180 Z" fill="url(#cyanGrad)" />
+    <!-- Ribbon Bow Right -->
+    <path d="M 276 180 C 332 180 364 100 312 90 C 268 80 260 160 256 180 Z" fill="url(#cyanGrad)" />
+
+    <!-- Bow Center Knot -->
+    <circle cx="256" cy="180" r="20" fill="#0284c7" />
+    <circle cx="256" cy="180" r="14" fill="#38bdf8" />
+  </g>
+</svg>

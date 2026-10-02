@@ -1,0 +1,188 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum OtpType {
+  REGISTRATION
+  PASSWORD_RESET
+}
+
+enum Visibility {
+  PUBLIC
+  PRIVATE
+}
+
+enum ImageType {
+  URL
+  LOCAL
+  NONE
+}
+
+enum FriendshipStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+}
+
+enum SecretSantaStatus {
+  DRAFT
+  DRAWN
+  COMPLETED
+}
+
+model User {
+  id             String             @id @default(uuid())
+  username       String             @unique
+  email          String             @unique
+  firstName      String             @default("")
+  lastName       String             @default("")
+  avatarUrl      String?
+  passwordHash   String
+  isVerified     Boolean            @default(false)
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  wishlists                Wishlist[]
+  savedWishlists           SavedWishlist[]
+  whitelistEntries         WishlistWhitelist[]
+  authOtps                 AuthOtp[]
+  sentFriendships          Friendship[]        @relation("SentFriendships")
+  receivedFriendships      Friendship[]        @relation("ReceivedFriendships")
+  createdSecretSantaGroups SecretSantaGroup[]  @relation("CreatedSecretSantaGroups")
+  secretSantaMemberships   SecretSantaMember[] @relation("SecretSantaParticipations")
+  secretSantaAssignments   SecretSantaMember[] @relation("SecretSantaAssignedTo")
+
+  @@index([username])
+  @@index([email])
+}
+
+model AuthOtp {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  otpHash   String
+  type      OtpType
+  expiresAt DateTime
+  attempts  Int      @default(0)
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+model Wishlist {
+  id          String              @id @default(uuid())
+  userId      String
+  user        User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title       String
+  description String?
+  occasion    String?
+  visibility  Visibility          @default(PUBLIC)
+  shareSlug   String              @unique
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  items          Item[]
+  whitelistUsers WishlistWhitelist[]
+  savedByUsers   SavedWishlist[]
+
+  @@index([userId])
+  @@index([shareSlug])
+}
+
+model WishlistWhitelist {
+  id         String   @id @default(uuid())
+  wishlistId String
+  wishlist   Wishlist @relation(fields: [wishlistId], references: [id], onDelete: Cascade)
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+
+  @@unique([wishlistId, userId])
+}
+
+model SavedWishlist {
+  id         String   @id @default(uuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  wishlistId String
+  wishlist   Wishlist @relation(fields: [wishlistId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+
+  @@unique([userId, wishlistId])
+}
+
+model Item {
+  id          String    @id @default(uuid())
+  wishlistId  String
+  wishlist    Wishlist  @relation(fields: [wishlistId], references: [id], onDelete: Cascade)
+  title       String
+  price       Float?
+  currency    String    @default("EUR")
+  url         String?
+  imageType   ImageType @default(NONE)
+  imageUrl    String?
+  priority    Int       @default(5)
+  isPurchased Boolean   @default(false)
+  purchasedBy String?
+  purchasedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([wishlistId])
+}
+
+model Friendship {
+  id         String           @id @default(uuid())
+  senderId   String
+  sender     User             @relation("SentFriendships", fields: [senderId], references: [id], onDelete: Cascade)
+  receiverId String
+  receiver   User             @relation("ReceivedFriendships", fields: [receiverId], references: [id], onDelete: Cascade)
+  status     FriendshipStatus @default(PENDING)
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
+
+  @@unique([senderId, receiverId])
+  @@index([senderId])
+  @@index([receiverId])
+  @@index([status])
+}
+
+model SecretSantaGroup {
+  id           String            @id @default(uuid())
+  title        String
+  description  String?
+  budget       Float             @default(0)
+  exchangeDate DateTime?
+  status       SecretSantaStatus @default(DRAFT)
+  creatorId    String
+  creator      User              @relation("CreatedSecretSantaGroups", fields: [creatorId], references: [id], onDelete: Cascade)
+  members      SecretSantaMember[]
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  @@index([creatorId])
+  @@index([status])
+}
+
+model SecretSantaMember {
+  id           String           @id @default(uuid())
+  groupId      String
+  group        SecretSantaGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  userId       String
+  user         User             @relation("SecretSantaParticipations", fields: [userId], references: [id], onDelete: Cascade)
+  assignedToId String?
+  assignedTo   User?            @relation("SecretSantaAssignedTo", fields: [assignedToId], references: [id], onDelete: SetNull)
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  @@unique([groupId, userId])
+  @@index([groupId])
+  @@index([userId])
+  @@index([assignedToId])
+}
