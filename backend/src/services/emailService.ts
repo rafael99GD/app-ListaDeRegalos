@@ -64,6 +64,86 @@ const getFromAddress = (): string => {
 };
 
 /**
+ * Extrae la dirección limpia de correo del remitente para la API REST.
+ */
+const getCleanSenderEmail = (): string => {
+  const rawFrom = process.env.EMAIL_FROM?.trim() || process.env.SMTP_USER?.trim() || 'no-reply@wishlisthub.app';
+  const match = rawFrom.match(/<([^>]+)>/);
+  return match ? match[1].trim() : rawFrom;
+};
+
+interface SendBrevoEmailParams {
+  to: string;
+  subject: string;
+  html: string;
+  text?: string;
+}
+
+/**
+ * Realiza el envío de correos utilizando la API REST HTTPS oficial de Brevo (puerto 443 estándar).
+ * Evita bloqueos a nivel de red/firewall en entornos en la nube como Render (puertos 587/465 bloqueados).
+ */
+const sendBrevoRestEmail = async ({
+  to,
+  subject,
+  html,
+  text,
+}: SendBrevoEmailParams): Promise<{ success: boolean; id?: string; error?: string }> => {
+  const apiKey = process.env.BREVO_API_KEY?.trim();
+  if (!apiKey) {
+    return { success: false, error: 'BREVO_API_KEY no está configurada' };
+  }
+
+  const senderEmail = getCleanSenderEmail();
+  const payload = {
+    sender: {
+      name: 'Wishlist Hub',
+      email: senderEmail,
+    },
+    to: [{ email: to }],
+    subject,
+    htmlContent: html,
+    ...(text ? { textContent: text } : {}),
+  };
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 15000);
+
+  try {
+    const response = await fetch('https://api.brevo.com/v3/smtp/email', {
+      method: 'POST',
+      headers: {
+        'accept': 'application/json',
+        'api-key': apiKey,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+      signal: controller.signal,
+    });
+
+    const responseData: any = await response.json().catch(() => null);
+
+    if (!response.ok) {
+      const errorDetail =
+        responseData?.message || responseData?.code || response.statusText || 'Error en API de Brevo';
+      console.error(`[EMAIL ERROR] Brevo REST API devolvió status ${response.status}:`, responseData || errorDetail);
+      return { success: false, error: errorDetail };
+    }
+
+    const messageId = responseData?.messageId || 'sent';
+    console.log(`✅ [EMAIL BREVO REST ENVIADO] Correo enviado exitosamente a ${to} (MessageId: ${messageId})`);
+    return { success: true, id: messageId };
+  } catch (err: any) {
+    const isAbort = err.name === 'AbortError';
+    const msg = isAbort ? 'Brevo REST API timeout tras 15 segundos' : (err.message || 'Error de conexión');
+    console.error('[EMAIL ERROR] Excepción al llamar a Brevo REST API:', msg);
+    return { success: false, error: msg };
+  } finally {
+    clearTimeout(timeoutId);
+  }
+};
+
+/**
  * Genera el cuerpo en texto plano del correo de OTP
  */
 const generatePlainTextOtpEmail = (
@@ -235,7 +315,24 @@ export const sendOtpEmail = async (
   const html = generateHtmlOtpEmail(otpCode, userName, type);
   const text = generatePlainTextOtpEmail(otpCode, userName, type);
 
-  // 1. Intentar envío prioritario a través de SMTP (Brevo / Nodemailer)
+  // 1. Envío prioritario mediante la API REST HTTPS oficial de Brevo (puerto 443 estándar)
+  if (process.env.BREVO_API_KEY?.trim()) {
+    try {
+      const result = await sendBrevoRestEmail({ to, subject, html, text });
+      if (result.success) {
+        return result;
+      }
+      console.error('[EMAIL ERROR]:', result.error);
+      console.log(`[DEV EMAIL FALLBACK] Código OTP para ${to}: ${otpCode}`);
+      return result;
+    } catch (error: any) {
+      console.error('[EMAIL ERROR]:', error.message || error);
+      console.log(`[DEV EMAIL FALLBACK] Código OTP para ${to}: ${otpCode}`);
+      return { success: false, error: error.message || 'Error al conectar con la API de Brevo' };
+    }
+  }
+
+  // 2. Soporte secundario vía SMTP si se configuró explícitamente y no hay Brevo API Key
   const smtpTransporter = getSmtpTransporter();
   if (smtpTransporter) {
     try {
@@ -359,7 +456,22 @@ export const sendSecretSantaNotification = async ({
 
   const text = `¡Hola @${recipientUsername}!\n\nEn el evento "${groupTitle}", tu amigo invisible secreto es: @${assignedUsername}\nPresupuesto: ${budgetText}\nFecha: ${dateText}\n\nConsulta su lista de regalos en: ${url}`;
 
-  // 1. Intentar envío prioritario por SMTP (Brevo / Nodemailer)
+  // 1. Envío prioritario mediante la API REST HTTPS oficial de Brevo (puerto 443 estándar)
+  if (process.env.BREVO_API_KEY?.trim()) {
+    try {
+      const result = await sendBrevoRestEmail({ to, subject, html, text });
+      if (result.success) {
+        return result;
+      }
+      console.error('[EMAIL ERROR]:', result.error);
+      return result;
+    } catch (error: any) {
+      console.error('[EMAIL ERROR]:', error.message || error);
+      return { success: false, error: error.message || 'Error al conectar con la API de Brevo' };
+    }
+  }
+
+  // 2. Soporte secundario vía SMTP (Brevo / Nodemailer)
   const smtpTransporter = getSmtpTransporter();
   if (smtpTransporter) {
     try {
