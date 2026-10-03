@@ -62,7 +62,16 @@ export const register = async (req: Request, res: Response, next: NextFunction):
         },
       });
 
-      await emailService.sendOtpEmail(email, otp, existingUser.username, 'REGISTRATION');
+      const emailResult = await emailService.sendOtpEmail(email, otp, existingUser.username, 'REGISTRATION');
+
+      if (!emailResult.success && process.env.NODE_ENV === 'production') {
+        res.status(500).json({
+          success: false,
+          message: 'Error al enviar el correo con el código de verificación. Por favor, inténtalo de nuevo.',
+          error: emailResult.error,
+        });
+        return;
+      }
 
       res.status(200).json({
         success: true,
@@ -105,7 +114,16 @@ export const register = async (req: Request, res: Response, next: NextFunction):
     });
 
     // Enviar email con código OTP
-    await emailService.sendOtpEmail(email, otp, user.username, 'REGISTRATION');
+    const emailResult = await emailService.sendOtpEmail(email, otp, user.username, 'REGISTRATION');
+
+    if (!emailResult.success && process.env.NODE_ENV === 'production') {
+      res.status(500).json({
+        success: false,
+        message: 'No se pudo enviar el correo de verificación. Por favor revisa tus datos o inténtalo más tarde.',
+        error: emailResult.error,
+      });
+      return;
+    }
 
     res.status(201).json({
       success: true,
@@ -276,7 +294,16 @@ export const resendRegistrationOtp = async (req: Request, res: Response, next: N
       },
     });
 
-    await emailService.sendOtpEmail(user.email, otp, user.username, 'REGISTRATION');
+    const emailResult = await emailService.sendOtpEmail(user.email, otp, user.username, 'REGISTRATION');
+
+    if (!emailResult.success && process.env.NODE_ENV === 'production') {
+      res.status(500).json({
+        success: false,
+        message: 'No se pudo enviar el correo de verificación. Por favor inténtalo más tarde.',
+        error: emailResult.error,
+      });
+      return;
+    }
 
     res.status(200).json({
       success: true,
@@ -386,7 +413,16 @@ export const forgotPassword = async (req: Request, res: Response, next: NextFunc
       },
     });
 
-    await emailService.sendOtpEmail(user.email, otp, user.username, 'PASSWORD_RESET');
+    const emailResult = await emailService.sendOtpEmail(user.email, otp, user.username, 'PASSWORD_RESET');
+
+    if (!emailResult.success && process.env.NODE_ENV === 'production') {
+      res.status(500).json({
+        success: false,
+        message: 'No se pudo enviar el correo de recuperación. Por favor inténtalo más tarde.',
+        error: emailResult.error,
+      });
+      return;
+    }
 
     res.status(200).json({
       success: true,

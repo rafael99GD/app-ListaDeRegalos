@@ -19,7 +19,7 @@ let lastConfigKey = '';
  */
 const getSmtpTransporter = (): Transporter | null => {
   const host = process.env.SMTP_HOST?.trim() || 'smtp-relay.brevo.com';
-  const port = parseInt(process.env.SMTP_PORT?.trim() || '587', 10);
+  const port = Number(process.env.SMTP_PORT) || 587;
   const user = process.env.SMTP_USER?.trim();
   const pass = process.env.SMTP_PASS?.trim();
 
@@ -31,13 +31,16 @@ const getSmtpTransporter = (): Transporter | null => {
   const currentKey = `${host}:${port}:${user}:${pass}`;
   if (!cachedTransporter || lastConfigKey !== currentKey) {
     cachedTransporter = nodemailer.createTransport({
-      host,
-      port,
-      secure: port === 465, // true para puerto 465 (SSL), false para 587 (STARTTLS)
+      host: process.env.SMTP_HOST || 'smtp-relay.brevo.com',
+      port: Number(process.env.SMTP_PORT) || 587,
+      secure: Number(process.env.SMTP_PORT) === 465, // false para 587
       auth: {
-        user,
-        pass,
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS,
       },
+      connectionTimeout: 10000, // 10 segundos max
+      greetingTimeout: 10000,
+      socketTimeout: 15000,
       tls: {
         rejectUnauthorized: process.env.NODE_ENV === 'production',
       },
@@ -208,6 +211,8 @@ export const sendOtpEmail = async (
   userNameOrType?: string | OtpEmailType,
   typeParam?: OtpEmailType
 ): Promise<SendOtpEmailResult> => {
+  console.log('[EMAIL] Intentando enviar correo a:', to);
+
   // Resolver parámetros
   let userName: string | undefined;
   let type: OtpEmailType = 'REGISTRATION';
@@ -234,18 +239,23 @@ export const sendOtpEmail = async (
   const smtpTransporter = getSmtpTransporter();
   if (smtpTransporter) {
     try {
-      const info = await smtpTransporter.sendMail({
-        from: fromEmail,
-        to,
-        subject,
-        html,
-        text,
-      });
+      const info = await Promise.race([
+        smtpTransporter.sendMail({
+          from: fromEmail,
+          to,
+          subject,
+          html,
+          text,
+        }),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('SMTP timeout: el servidor de correo no respondió a tiempo')), 15000)
+        ),
+      ]);
 
       console.log(`✅ [EMAIL SMTP ENVIADO] OTP enviado exitosamente a ${to} (MessageId: ${info.messageId})`);
       return { success: true, id: info.messageId };
     } catch (error: any) {
-      console.error('❌ Error al enviar correo vía SMTP (Brevo):', error.message || error);
+      console.error('[EMAIL ERROR]:', error);
       // Fallback de seguridad en consola para no bloquear la experiencia de desarrollo
       console.log(`[DEV EMAIL FALLBACK] Código OTP para ${to}: ${otpCode}`);
       return { success: false, error: error.message || 'Error al enviar correo vía SMTP' };
@@ -313,6 +323,7 @@ export const sendSecretSantaNotification = async ({
   exchangeDate,
   appUrl,
 }: SendSecretSantaEmailParams): Promise<{ success: boolean; id?: string; error?: string }> => {
+  console.log('[EMAIL] Intentando enviar correo a:', to);
   const subject = `🎅 ¡Sorteo de Amigo Invisible en "${groupTitle}"!`;
   const url = appUrl || process.env.FRONTEND_URL || 'http://localhost:5173/secret-santa';
   const budgetText = budget && budget > 0 ? `${budget} €` : 'Sin límite';
@@ -352,18 +363,23 @@ export const sendSecretSantaNotification = async ({
   const smtpTransporter = getSmtpTransporter();
   if (smtpTransporter) {
     try {
-      const info = await smtpTransporter.sendMail({
-        from: fromEmail,
-        to,
-        subject,
-        html,
-        text,
-      });
+      const info = await Promise.race([
+        smtpTransporter.sendMail({
+          from: fromEmail,
+          to,
+          subject,
+          html,
+          text,
+        }),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('SMTP timeout: el servidor de correo no respondió a tiempo')), 15000)
+        ),
+      ]);
 
       console.log(`✅ [EMAIL SMTP ENVIADO] Amigo Invisible enviado a ${to} (MessageId: ${info.messageId})`);
       return { success: true, id: info.messageId };
     } catch (err: any) {
-      console.error('❌ Error al enviar Secret Santa vía SMTP (Brevo):', err.message || err);
+      console.error('[EMAIL ERROR]:', err);
       return { success: false, error: err.message };
     }
   }
